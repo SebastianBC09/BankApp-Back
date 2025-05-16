@@ -7,10 +7,14 @@ class Auth0JwtValidator {
     this.auth0Audience = config.auth0.audience;
 
     if (!this.auth0Domain) {
-      throw new Error('Error de configuración: auth0.domain no está definido en envConfig. La aplicación no puede iniciar.');
+      throw new Error(
+        'Error de configuración: auth0.domain no está definido en envConfig. La aplicación no puede iniciar.'
+      );
     }
     if (!this.auth0Audience) {
-      throw new Error('Error de configuración: auth0.audience no está definido en envConfig. La aplicación no puede iniciar.');
+      throw new Error(
+        'Error de configuración: auth0.audience no está definido en envConfig. La aplicación no puede iniciar.'
+      );
     }
   }
 

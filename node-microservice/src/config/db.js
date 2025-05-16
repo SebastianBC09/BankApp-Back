@@ -6,7 +6,9 @@ class DatabaseConnector {
     this.mongoURI = config.mongo.uri;
 
     if (!this.mongoURI) {
-      console.error('FATAL ERROR: MONGO_URI no está disponible a través de la configuración centralizada para DatabaseConnector.');
+      console.error(
+        'FATAL ERROR: MONGO_URI no está disponible a través de la configuración centralizada para DatabaseConnector.'
+      );
       process.exit(1);
     }
   }

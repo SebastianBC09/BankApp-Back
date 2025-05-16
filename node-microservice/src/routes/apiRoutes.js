@@ -22,7 +22,7 @@ router.get('/me', checkJwt, provisionUser, (req, res) => {
   if (!req.currentUser) {
     return res.status(404).json({
       status: 'error',
-      message: 'Usuario autenticado no encontrado o no provisionado en la base de datos local.'
+      message: 'Usuario autenticado no encontrado o no provisionado en la base de datos local.',
     });
   }
   res.json({
@@ -35,7 +35,7 @@ router.get('/me', checkJwt, provisionUser, (req, res) => {
       email: req.currentUser.email,
       roles: req.currentUser.roles,
       status: req.currentUser.status,
-    }
+    },
   });
 });
 
