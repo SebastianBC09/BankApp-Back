@@ -7,4 +7,6 @@ const router = express.Router();
 
 router.get('/:accountId/balance', checkJwt, provisionUser, accountController.getBalance);
 
+router.post('/:accountId/withdraw', checkJwt, provisionUser, accountController.withdraw);
+
 export default router;
