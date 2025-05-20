@@ -48,6 +48,33 @@ class AccountController {
             next(error);
         }
     }
+
+    async deposit(req, res, next) {
+        try {
+            const accountId = req.params.accountId;
+            const userId = req.currentUser._id;
+            const { amount } = req.body;
+            const clientIp = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress;
+
+            if (amount === undefined) {
+                throw new AppError('El campo "amount" (monto) es requerido en el cuerpo de la petición.', 400);
+            }
+
+            const depositData = await accountService.depositToAccount({
+                accountId,
+                userId,
+                amount,
+                clientIp,
+            });
+
+            res.status(201).json({
+                status: 'success',
+                data: depositData,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 };
 
 export default new AccountController();
