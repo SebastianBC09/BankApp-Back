@@ -9,4 +9,6 @@ router.get('/:accountId/balance', checkJwt, provisionUser, accountController.get
 
 router.post('/:accountId/withdraw', checkJwt, provisionUser, accountController.withdraw);
 
+router.post('/:accountId/deposit', checkJwt, provisionUser, accountController.deposit);
+
 export default router;
