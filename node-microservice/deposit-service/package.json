@@ -1,0 +1,41 @@
+{
+  "name": "deposit-service",
+  "version": "1.0.0",
+  "description": "Microservicio para la gestión de depósitos bancarios.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development nodemon server.js",
+    "lint": "eslint . --ext .js,.mjs --fix",
+    "lint:check": "eslint . --ext .js,.mjs",
+    "format": "prettier --write \"**/*.{js,mjs,json,md,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,json,md,yaml,yml}\""
+  },
+  "keywords": [
+    "deposit",
+    "accounts",
+    "banking",
+    "microservice",
+    "transaction"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "mongoose": "^8.15.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.27.0",
+    "cross-env": "^7.0.3",
+    "eslint": "^9.27.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^5.4.0",
+    "globals": "^16.1.0",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.5.3"
+  }
+}
