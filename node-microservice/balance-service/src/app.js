@@ -19,7 +19,7 @@ if (config.nodeEnv === 'development') {
 
 app.use(cors());
 
-app.use('/balance', balanceRoute);
+app.use('/account', balanceRoute);
 
 app.get('/', (req, res) => {
   res.send(`Balance Service (Modo: ${config.nodeEnv}) funcionando!`);
