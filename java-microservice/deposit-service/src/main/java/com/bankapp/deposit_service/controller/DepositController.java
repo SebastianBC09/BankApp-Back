@@ -4,7 +4,7 @@ import com.bankapp.deposit_service.dto.AccountTransactionResponseDataDTO;
 import com.bankapp.deposit_service.dto.AmountRequestDTO;
 import com.bankapp.deposit_service.dto.ApiResponseDTO;
 import com.bankapp.deposit_service.exception.InvalidInputException;
-import com.bankapp.deposit_service.service.DepositService;
+import com.bankapp.deposit_service.service.DefaultDepositService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,10 +15,10 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/account/deposit")
 public class DepositController {
-    private final DepositService depositService;
+    private final DefaultDepositService depositService;
 
     @Autowired
-    public DepositController(DepositService depositService) {
+    public DepositController(DefaultDepositService depositService) {
         this.depositService = depositService;
     }
 

@@ -1,10 +1,10 @@
 package com.bankapp.withdrawal_service.controller;
 
-import com.bankapp.deposit_service.dto.AmountRequestDTO;
 import com.bankapp.withdrawal_service.dto.AccountTransactionResponseDataDTO;
+import com.bankapp.withdrawal_service.dto.AmountRequestDTO;
 import com.bankapp.withdrawal_service.dto.ApiResponseDTO;
 import com.bankapp.withdrawal_service.exception.InvalidInputException;
-import com.bankapp.withdrawal_service.service.WithdrawalService;
+import com.bankapp.withdrawal_service.service.DefaultWithdrawalService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,10 +14,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/account/withdraw")
 public class WithdrawalController {
-    private final WithdrawalService withdrawalService;
+
+    private final DefaultWithdrawalService withdrawalService;
 
     @Autowired
-    public WithdrawalController(WithdrawalService withdrawalService) {
+    public WithdrawalController(DefaultWithdrawalService withdrawalService) {
         this.withdrawalService = withdrawalService;
     }
 
@@ -28,7 +29,7 @@ public class WithdrawalController {
             @Valid @RequestBody AmountRequestDTO amountRequest,
             HttpServletRequest request) {
 
-        long userId;
+        Long userId;
         try {
             if (userIdString == null || userIdString.trim().isEmpty()) {
                 throw new InvalidInputException("X-User-ID header is missing or empty.");
@@ -36,10 +37,6 @@ public class WithdrawalController {
             userId = Long.parseLong(userIdString);
         } catch (NumberFormatException e) {
             throw new InvalidInputException("X-User-ID header contains an invalid user ID format.");
-        }
-
-        if (amountRequest == null || amountRequest.getAmount() == null) {
-            throw new InvalidInputException("Request body or amount field is missing.");
         }
 
         String clientIp = request.getHeader("X-Forwarded-For");
