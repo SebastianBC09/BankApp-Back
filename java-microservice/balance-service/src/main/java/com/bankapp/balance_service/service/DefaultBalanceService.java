@@ -7,7 +7,7 @@ import com.bankapp.balance_service.exception.ResourceNotFoundException;
 import com.bankapp.balance_service.exception.UnauthorizedAccessException;
 import com.bankapp.balance_service.model.Account;
 import com.bankapp.balance_service.repository.AccountRepository;
-import com.bankapp.balance_service.utils.TransactionLogger;
+import com.bankapp.balance_service.utils.TransactionLogger; // Correct import
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DefaultBalanceService implements BalanceService {
     private final AccountRepository accountRepository;
-    private static final Logger log = LoggerFactory.getLogger(DefaultBalanceService.class);
+    private static final Logger serviceLog = LoggerFactory.getLogger(DefaultBalanceService.class);
 
     @Autowired
     public DefaultBalanceService(AccountRepository accountRepository) {
@@ -27,31 +27,31 @@ public class DefaultBalanceService implements BalanceService {
     @Override
     @Transactional(readOnly = true)
     public AccountBalanceDataDTO getAccountBalance(Long accountId, Long userId, String clientIp) {
-        String userIdForLog = (userId == null) ? "N/A" : String.valueOf(userId);
-        String accountIdForLog = (accountId == null) ? "N/A" : String.valueOf(accountId);
-        String operationStatus = "FAILURE";
-        String logMessage = String.format("Attempting balance inquiry for account %s by user %s.", accountIdForLog, userIdForLog);
+        String userIdForLog = userId != null ? String.valueOf(userId) : null;
+        String accountIdForLog = accountId != null ? String.valueOf(accountId) : null;
+        String operationStatus;
+        String logMessage;
+
+        serviceLog.info("Attempting balance inquiry for account {} by user {}.", accountIdForLog, userIdForLog);
 
         try {
             if (userId == null) {
                 logMessage = "User ID not provided for balance inquiry (X-User-ID header might be missing or empty).";
                 operationStatus = "INVALID_ATTEMPT";
-                TransactionLogger.logOperation(userIdForLog, "BALANCE_INQUIRY", accountIdForLog, operationStatus, logMessage, clientIp);
+                TransactionLogger.logOperation(null, "BALANCE_INQUIRY", accountIdForLog, operationStatus, logMessage, clientIp);
                 throw new InvalidInputException(logMessage);
             }
-
-            userIdForLog = String.valueOf(userId);
 
             if (accountId == null) {
                 logMessage = "Account ID not provided for balance inquiry.";
                 operationStatus = "INVALID_ATTEMPT";
-                TransactionLogger.logOperation(userIdForLog, "BALANCE_INQUIRY", accountIdForLog, operationStatus, logMessage, clientIp);
+                TransactionLogger.logOperation(userIdForLog, "BALANCE_INQUIRY", null, operationStatus, logMessage, clientIp);
                 throw new InvalidInputException(logMessage);
             }
-            accountIdForLog = String.valueOf(accountId);
 
-            String finalAccountIdForLog = accountIdForLog;
-            String finalUserIdForLog = userIdForLog;
+            final String finalAccountIdForLog = String.valueOf(accountId);
+            final String finalUserIdForLog = String.valueOf(userId);
+
             Account account = accountRepository.findByIdAndUserId(accountId, userId)
                     .orElseThrow(() -> {
                         boolean accountExistsButNotOwned = accountRepository.existsById(accountId);
@@ -62,15 +62,15 @@ public class DefaultBalanceService implements BalanceService {
                     });
 
             if (!"active".equalsIgnoreCase(account.getStatus()) && !"pending_activation".equalsIgnoreCase(account.getStatus())) {
-                logMessage = String.format("Balance inquiry not permitted: Account %s is not active or pending activation. Current status: %s.", accountIdForLog, account.getStatus());
-                operationStatus = "FAILURE"; // O "INVALID_OPERATION_ACCOUNT_STATUS"
-                TransactionLogger.logOperation(userIdForLog, "BALANCE_INQUIRY", accountIdForLog, operationStatus, logMessage, clientIp);
+                logMessage = String.format("Balance inquiry not permitted: Account %s is not active or pending activation. Current status: %s.", finalAccountIdForLog, account.getStatus());
+                operationStatus = "FAILURE";
+                TransactionLogger.logOperation(finalUserIdForLog, "BALANCE_INQUIRY", finalAccountIdForLog, operationStatus, logMessage, clientIp);
                 throw new AccountNotActiveException(logMessage);
             }
 
             operationStatus = "SUCCESS";
-            logMessage = String.format("Balance inquiry successful for account %s by user %s.", accountIdForLog, userIdForLog);
-            TransactionLogger.logOperation(userIdForLog, "BALANCE_INQUIRY", accountIdForLog, operationStatus, logMessage, clientIp);
+            logMessage = String.format("Balance inquiry successful for account %s by user %s.", finalAccountIdForLog, finalUserIdForLog);
+            TransactionLogger.logOperation(finalUserIdForLog, "BALANCE_INQUIRY", finalAccountIdForLog, operationStatus, logMessage, clientIp);
 
             return new AccountBalanceDataDTO(
                     account.getId(),
@@ -83,20 +83,17 @@ public class DefaultBalanceService implements BalanceService {
 
         } catch (Exception e) {
 
-            String finalLogMessage = (e instanceof InvalidInputException || e instanceof ResourceNotFoundException ||
-                    e instanceof UnauthorizedAccessException || e instanceof AccountNotActiveException)
-                    ? e.getMessage()
-                    : "Unexpected error during balance inquiry: " + e.getMessage();
+            if (!(e instanceof InvalidInputException ||
+                    e instanceof ResourceNotFoundException ||
+                    e instanceof UnauthorizedAccessException ||
+                    e instanceof AccountNotActiveException)) {
 
-            String finalStatus = (e instanceof InvalidInputException || e instanceof ResourceNotFoundException ||
-                    e instanceof UnauthorizedAccessException)
-                    ? "INVALID_ATTEMPT"
-                    : "FAILURE";
+                logMessage = "Unexpected error during balance inquiry: " + e.getMessage();
+                TransactionLogger.logOperation(userIdForLog, "BALANCE_INQUIRY", accountIdForLog, "FAILURE", logMessage, clientIp);
+                serviceLog.error("Unexpected error during balance inquiry for user {} and account {}: {}", userIdForLog, accountIdForLog, e.getMessage(), e);
+            } else {
 
-            if (!(e instanceof ResourceNotFoundException || e instanceof UnauthorizedAccessException || e instanceof AccountNotActiveException || e instanceof InvalidInputException)) {
-                TransactionLogger.logOperation(userIdForLog, "BALANCE_INQUIRY", accountIdForLog, finalStatus, finalLogMessage, clientIp);
-            } else if (operationStatus.equals("FAILURE") && !logMessage.contains("successful")) {
-                log.error("Handled operational error during balance inquiry for user {}: {}", userIdForLog, e.getMessage());
+                serviceLog.warn("Operational error during balance inquiry for user {}: {} - Account: {}", userIdForLog, e.getMessage(), accountIdForLog);
             }
             throw e;
         }
