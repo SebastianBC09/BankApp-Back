@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import config from './config/envConfig.js';
 import { checkJwt } from './middlewares/authMiddleware.js';
 import { provisionUser } from './middlewares/userProvisioningMiddleware.js';
@@ -19,217 +19,204 @@ if (config.nodeEnv === 'development') {
   app.use(morgan('dev'));
 }
 
-const addUserHeaderAndFixBody = (proxyReq, req) => {
-  if (req.currentUser && req.currentUser._id) {
-    proxyReq.setHeader('X-User-ID', req.currentUser._id.toString());
-  }
-  if (req.body && (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH')) {
-    fixRequestBody(proxyReq, req);
-  }
-};
-
-const handleProxyError = (err, req, res, serviceName) => {
-  console.error(`Error en proxy hacia ${serviceName} para ${req.originalUrl}:`, err);
-  if (!res.headersSent) {
-    res
-      .status(502)
-      .json({ status: 'error', message: `Error al contactar el servicio de ${serviceName}.` });
-  }
-};
-
-const createNodeServiceProxyOptions = (targetUrl, serviceNameForLog) => ({
-  target: targetUrl,
+// Proxy middleware configuration
+const createProxyConfig = (target, pathRewrite = {}) => ({
+  target,
   changeOrigin: true,
-  pathRewrite: (path, req) => {
-    return path.replace('/api/v1/node/accounts', '');
+  pathRewrite,
+  onProxyReq: (proxyReq, req) => {
+    if (req.currentUser && req.currentUser._id) {
+      proxyReq.setHeader('X-User-ID', req.currentUser._id.toString());
+    }
+    if (req.body && (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH')) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+    }
   },
-  onProxyReq: addUserHeaderAndFixBody,
-  onError: (err, req, res) => handleProxyError(err, req, res, serviceNameForLog),
-});
-
-const createJavaServiceProxyOptions = (
-  targetUrl,
-  microserviceInternalBasePath,
-  serviceNameForLog
-) => ({
-  target: targetUrl,
-  changeOrigin: true,
-  pathRewrite: (path, req) => {
-    const pathParts = path.split('/');
-    const accountId = pathParts[5];
-    return `${microserviceInternalBasePath}/${accountId}`;
-  },
-  onProxyReq: addUserHeaderAndFixBody,
-  onError: (err, req, res) => handleProxyError(err, req, res, serviceNameForLog),
+  onError: (err, req, res) => {
+    console.error('Proxy Error:', err);
+    res.status(502).json({
+      status: 'error',
+      message: 'Error al conectar con el servicio.'
+    });
+  }
 });
 
 const protectedRouteMiddlewares = [checkJwt, provisionUser];
 
-// --- Swagger Docs (Configurado desde swaggerConfig.js) ---
+
+// Swagger setup
 const openapiSpecification = swaggerJSDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpecification, { explorer: true }));
+
 
 // --- Rutas para Servicios Node.js ---
 
 /**
  * @swagger
- * /api/v1/node/accounts/{accountId}/balance:
- * get:
- * summary: Consultar saldo de cuenta (Node.js)
- * tags: [Node.js - Accounts]
- * description: Obtiene el saldo y detalles de una cuenta específica del usuario autenticado, procesado por el servicio Node.js.
- * security:
- * - bearerAuth: []
- * parameters:
- * - in: path
- * name: accountId
- * required: true
- * description: ID de la cuenta (MongoDB ObjectId) a consultar.
- * schema:
- * type: string
- * format: objectid
- * responses:
- * '200':
- * description: Saldo obtenido exitosamente.
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/NodeAccountBalanceResponse'
- * '401':
- * $ref: '#/components/responses/UnauthorizedError'
- * '403':
- * $ref: '#/components/responses/ForbiddenError'
- * '404':
- * $ref: '#/components/responses/NotFoundError'
- * '500':
- * $ref: '#/components/responses/InternalServerError'
+ * /api/v1/node/accounts/balance/{accountId}:
+ *   get:
+ *     summary: Consultar saldo de cuenta (Node.js)
+ *     tags: [Node.js - Accounts]
+ *     description: Obtiene el saldo y detalles de una cuenta específica del usuario autenticado, procesado por el servicio Node.js.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: accountId
+ *         required: true
+ *         description: ID de la cuenta (MongoDB ObjectId) a consultar.
+ *         schema:
+ *           type: string
+ *           format: objectid
+ *     responses:
+ *       '200':
+ *         description: Saldo obtenido exitosamente.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/NodeAccountBalanceResponse'
+ *       '401':
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       '404':
+ *         $ref: '#/components/responses/NotFoundError'
+ *       '500':
+ *         $ref: '#/components/responses/InternalServerError'
  */
 app.use(
   '/api/v1/node/accounts/balance/:accountId',
-  ...protectedRouteMiddlewares,
+  protectedRouteMiddlewares,
   createProxyMiddleware(
-    createNodeServiceProxyOptions(config.services.node.balance, 'NodeBalanceService')
+    createProxyConfig(config.services.node.balance)
   )
 );
 
 /**
  * @swagger
- * /api/v1/node/accounts/{accountId}/deposit:
- * post:
- * summary: Realizar un depósito en cuenta (Node.js)
- * tags: [Node.js - Accounts]
- * description: Deposita un monto especificado en una cuenta del usuario autenticado, procesado por el servicio Node.js.
- * security:
- * - bearerAuth: []
- * parameters:
- * - in: path
- * name: accountId
- * required: true
- * description: ID de la cuenta (MongoDB ObjectId) en la cual depositar.
- * schema:
- * type: string
- * format: objectid
- * requestBody:
- * required: true
- * description: Monto a depositar.
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/NodeAmountRequest'
- * responses:
- * '200':
- * description: Depósito exitoso.
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/NodeAccountTransactionResponse'
- * '400':
- * $ref: '#/components/responses/BadRequestError'
- * '401':
- * $ref: '#/components/responses/UnauthorizedError'
- * '403':
- * $ref: '#/components/responses/ForbiddenError'
- * '404':
- * $ref: '#/components/responses/NotFoundError'
- * '500':
- * $ref: '#/components/responses/InternalServerError'
+ * /api/v1/node/accounts/deposit/{accountId}:
+ *   post:
+ *     summary: Realizar un depósito en cuenta (Node.js)
+ *     tags: [Node.js - Accounts]
+ *     description: Deposita un monto especificado en una cuenta del usuario autenticado, procesado por el servicio Node.js.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: accountId
+ *         required: true
+ *         description: ID de la cuenta (MongoDB ObjectId) en la cual depositar.
+ *         schema:
+ *           type: string
+ *           format: objectid
+ *     requestBody:
+ *       required: true
+ *       description: Monto a depositar.
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/NodeAmountRequest'
+ *     responses:
+ *       '200':
+ *         description: Depósito exitoso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/NodeAccountTransactionResponse'
+ *       '400':
+ *         $ref: '#/components/responses/BadRequestError'
+ *       '401':
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       '404':
+ *         $ref: '#/components/responses/NotFoundError'
+ *       '500':
+ *         $ref: '#/components/responses/InternalServerError'
  */
 app.use(
   '/api/v1/node/accounts/deposit/:accountId',
-  ...protectedRouteMiddlewares,
+  protectedRouteMiddlewares,
   createProxyMiddleware(
-    createNodeServiceProxyOptions(config.services.node.deposit, 'NodeDepositService')
+    createProxyConfig
+    (config.services.node.deposit)
+  )
+);
+
+/**
+ * @swagger
+ * /api/v1/node/accounts/withdraw/{accountId}:
+ *   post:
+ *     summary: Realizar un retiro de cuenta (Node.js)
+ *     tags: [Node.js - Accounts]
+ *     description: Retira un monto especificado de una cuenta del usuario autenticado, procesado por el servicio Node.js.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: accountId
+ *         required: true
+ *         description: ID de la cuenta (MongoDB ObjectId) de la cual retirar.
+ *         schema:
+ *           type: string
+ *           format: objectid
+ *     requestBody:
+ *       required: true
+ *       description: Monto a retirar.
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/NodeAmountRequest'
+ *     responses:
+ *       '200':
+ *         description: Retiro exitoso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/NodeAccountTransactionResponse'
+ *       '400':
+ *         $ref: '#/components/responses/BadRequestError'
+ *       '401':
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       '404':
+ *         $ref: '#/components/responses/NotFoundError'
+ *       '500':
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+app.use(
+  '/api/v1/node/accounts/withdraw/:accountId',
+  protectedRouteMiddlewares,
+  createProxyMiddleware(
+    createProxyConfig(config.services.node.withdrawal)
   )
 );
 
 // --- Enrutamiento para Servicios Java/Spring Boot ---
 
-/**
- * @swagger
- * /api/v1/node/accounts/{accountId}/withdraw:
- * post:
- * summary: Realizar un retiro de cuenta (Node.js)
- * tags: [Node.js - Accounts]
- * description: Retira un monto especificado de una cuenta del usuario autenticado, procesado por el servicio Node.js.
- * security:
- * - bearerAuth: []
- * parameters:
- * - in: path
- * name: accountId
- * required: true
- * description: ID de la cuenta (MongoDB ObjectId) de la cual retirar.
- * schema:
- * type: string
- * format: objectid
- * requestBody:
- * required: true
- * description: Monto a retirar.
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/NodeAmountRequest'
- * responses:
- * '200':
- * description: Retiro exitoso.
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/NodeAccountTransactionResponse'
- * '400':
- * $ref: '#/components/responses/BadRequestError'
- * '401':
- * $ref: '#/components/responses/UnauthorizedError'
- * '403':
- * $ref: '#/components/responses/ForbiddenError'
- * '404':
- * $ref: '#/components/responses/NotFoundError'
- * '500':
- * $ref: '#/components/responses/InternalServerError'
- */
-app.use(
-  '/api/v1/node/accounts/withdraw/:accountId',
-  ...protectedRouteMiddlewares,
-  createProxyMiddleware(
-    createNodeServiceProxyOptions(config.services.node.withdrawal, 'NodeWithdrawalService')
-  )
-);
-
 app.use(
   '/api/v1/java/accounts/balance/:accountId',
-  ...protectedRouteMiddlewares,
-  createProxyMiddleware(createServiceProxyOptions(config.services.balance, '/balance'))
+  protectedRouteMiddlewares,
+  createProxyMiddleware(
+    createProxyConfig(config.services.balance))
 );
 
 app.use(
   '/api/v1/java/accounts/deposit/:accountId',
-  ...protectedRouteMiddlewares,
-  createProxyMiddleware(createServiceProxyOptions(config.services.deposit, '/deposit'))
+  protectedRouteMiddlewares,
+  createProxyMiddleware(
+    createProxyConfig(config.services.deposit))
 );
 
 app.use(
   '/api/v1/java/accounts/withdraw/:accountId',
-  ...protectedRouteMiddlewares,
-  createProxyMiddleware(createServiceProxyOptions(config.services.withdrawal, '/withdraw'))
+  protectedRouteMiddlewares,
+  createProxyMiddleware(
+    createProxyConfig(config.services.withdrawal))
 );
 
 // Rutas de Usuario (ej. completar perfil)
@@ -238,40 +225,27 @@ app.use(
 // Por ahora, si la lógica de completar perfil (userController, userService)
 // la quieres en el Gateway porque maneja el UserModel:
 // import userRouter from './routes/userRoutes.js'; // Necesitarías crear este router en el Gateway
-// app.use('/api/v1/users', checkJwt, provisionUser, addUserHeader, userRouter);
+
 
 app.get('/', (_req, res) => {
   res.send(
-    `API Gateway (Modo: ${config.nodeEnv}) funcionando! Hora Bogotá: ${new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' })}`
+    `API Gateway (${config.nodeEnv}) - Status: OK - ${new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' })}`
   );
 });
 
+// Error handling middleware
 app.use((err, _req, res, _next) => {
-  err.statusCode = err.statusCode || 500;
-  err.status = err.status || 'error';
-  const isOperationalError = err.isOperational || false;
+  const statusCode = err.statusCode || 500;
+  const status = err.status || 'error';
 
   if (config.nodeEnv !== 'test') {
-    console.error('ERROR EN API GATEWAY 💥:', {
-      name: err.name,
-      message: err.message,
-      statusCode: err.statusCode,
-      status: err.status,
-      isOperational: isOperationalError,
-      stack: config.nodeEnv === 'development' ? err.stack : undefined,
-    });
+    console.error('API Gateway Error:', err);
   }
 
-  const errorResponse = {
-    status: err.status,
-    message:
-      isOperationalError || config.nodeEnv === 'development'
-        ? err.message
-        : 'Ocurrió un error inesperado en el servidor.',
-  };
-  if (config.nodeEnv === 'development' && err.stack) errorResponse.stack = err.stack;
-
-  if (!res.headersSent) res.status(err.statusCode).json(errorResponse);
+  res.status(statusCode).json({
+    status,
+    message: config.nodeEnv === 'development' ? err.message : 'Internal server error'
+  });
 });
 
 export default app;
