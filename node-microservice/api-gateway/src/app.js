@@ -34,38 +34,69 @@ const handleProxyError = (err, req, res, serviceName) => {
   }
 };
 
-const createServiceProxy = (target, microserviceBasePath, serviceName) => {
-  return createProxyMiddleware({
-    target,
-    changeOrigin: true,
-    pathRewrite: (path, req) => {
-      const remainingPath = path.replace('/api/v1/accounts', '');
-      return `${microserviceBasePath}${remainingPath}`;
-    },
-    onProxyReq: addUserHeaderAndFixBody,
-    onError: (err, req, res) => handleProxyError(err, req, res, serviceName),
-  });
-};
+const createServiceProxyOptions = (
+  targetUrl,
+  microserviceInternalBasePath,
+  serviceNameForLog,
+  isJavaService = false
+) => ({
+  target: targetUrl,
+  changeOrigin: true,
+  pathRewrite: (path, req) => {
+    let newPath = '';
+    if (isJavaService) {
+      const pathParts = path.split('/');
+      const accountId = pathParts[5];
+      newPath = `${microserviceInternalBasePath}/${accountId}`;
+    } else {
+      const baseApiPrefixToRemove = '/api/v1/node/accounts';
+      const remainingPath = path.startsWith(baseApiPrefixToRemove)
+        ? path.substring(baseApiPrefixToRemove.length)
+        : path;
+      newPath = `${microserviceInternalBasePath}${remainingPath}`;
+    }
+    return newPath;
+  },
+  onProxyReq: addUserHeaderAndFixBody,
+  onError: (err, req, res) => handleProxyError(err, req, res, serviceNameForLog),
+});
+
+const protectedRouteMiddlewares = [checkJwt, provisionUser];
 
 app.use(
-  '/api/v1/accounts/balance/:accountId',
+  '/api/v1/node/accounts/balance/:accountId',
+  ...protectedRouteMiddlewares,
+  createProxyMiddleware(createServiceProxyOptions(config.services.balance, '/balance'))
+);
+app.use(
+  '/api/v1/node/accounts/deposit/:accountId',
   checkJwt,
   provisionUser,
-  createProxyMiddleware(createAccountProxyOptions(config.services.balance, '/balance'))
+  createProxyMiddleware(createServiceProxyOptions(config.services.deposit, '/deposit'))
+);
+app.use(
+  '/api/v1/node/accounts/withdraw/:accountId',
+  checkJwt,
+  provisionUser,
+  createProxyMiddleware(createServiceProxyOptions(config.services.withdrawal, '/withdraw'))
 );
 
 app.use(
-  '/api/v1/accounts/deposit/:accountId',
-  checkJwt,
-  provisionUser,
-  createProxyMiddleware(createAccountProxyOptions(config.services.deposit, '/deposit'))
+  '/api/v1/java/accounts/balance/:accountId',
+  ...protectedRouteMiddlewares,
+  createProxyMiddleware(createServiceProxyOptions(config.services.balance, '/balance'))
 );
 
 app.use(
-  '/api/v1/accounts/withdraw/:accountId',
-  checkJwt,
-  provisionUser,
-  createProxyMiddleware(createAccountProxyOptions(config.services.withdrawal, '/withdraw'))
+  '/api/v1/java/accounts/deposit/:accountId',
+  ...protectedRouteMiddlewares,
+  createProxyMiddleware(createServiceProxyOptions(config.services.deposit, '/deposit'))
+);
+
+app.use(
+  '/api/v1/java/accounts/withdraw/:accountId',
+  ...protectedRouteMiddlewares,
+  createProxyMiddleware(createServiceProxyOptions(config.services.withdrawal, '/withdraw'))
 );
 
 // Rutas de Usuario (ej. completar perfil)

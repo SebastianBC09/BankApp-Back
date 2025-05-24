@@ -13,32 +13,57 @@ const config = {
     audience: process.env.AUTH0_AUDIENCE,
   },
   services: {
-    balance: process.env.BALANCE_SERVICE_URL || 'http://localhost:3001',
-    deposit: process.env.DEPOSIT_SERVICE_URL || 'http://localhost:3002',
-    withdrawal: process.env.WITHDRAWAL_SERVICE_URL || 'http://localhost:3003',
-    // userProfile: process.env.USER_PROFILE_SERVICE_URL, // Si tuvieras uno para /me/profile
+    node: {
+      balance: process.env.NODE_BALANCE_SERVICE_URL,
+      deposit: process.env.NODE_DEPOSIT_SERVICE_URL,
+      withdrawal: process.env.NODE_WITHDRAWAL_SERVICE_URL,
+    },
+    java: {
+      balance: process.env.JAVA_BALANCE_SERVICE_URL,
+      deposit: process.env.JAVA_DEPOSIT_SERVICE_URL,
+      withdrawal: process.env.JAVA_WITHDRAWAL_SERVICE_URL,
+    },
   },
   urls: {
     clientUrl: process.env.CLIENT_URL || 'http://localhost:4200',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : (process.env.CLIENT_URL || 'http://localhost:4200'),
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',')
+      : process.env.CLIENT_URL || 'http://localhost:4200',
   },
 };
 
 const validateConfig = () => {
   const requiredEnvVars = [
-    'MONGO_URI', 'PORT',
-    'AUTH0_DOMAIN', 'AUTH0_AUDIENCE',
-    'BALANCE_SERVICE_URL', 'DEPOSIT_SERVICE_URL', 'WITHDRAWAL_SERVICE_URL'
+    'MONGO_URI',
+    'PORT',
+    'AUTH0_DOMAIN',
+    'AUTH0_AUDIENCE',
+    'NODE_BALANCE_SERVICE_URL',
+    'NODE_DEPOSIT_SERVICE_URL',
+    'NODE_WITHDRAWAL_SERVICE_URL',
+    'JAVA_BALANCE_SERVICE_URL',
+    'JAVA_DEPOSIT_SERVICE_URL',
+    'JAVA_WITHDRAWAL_SERVICE_URL',
   ];
-  const missingVars = requiredEnvVars.filter(key => !process.env[key]);
+  const missingVars = requiredEnvVars.filter((key) => !process.env[key]);
 
   if (missingVars.length > 0) {
-    throw new Error(`Error de configuración del API Gateway: Faltan variables de entorno críticas: ${missingVars.join(', ')}. Verifica tu archivo .env.`);
+    throw new Error(
+      `Error de configuración del API Gateway: Faltan variables de entorno críticas: ${missingVars.join(', ')}.`
+    );
   }
-  if (!config.mongo.uri || !config.auth0.domain || !config.auth0.audience) {
-    throw new Error('Configuración crítica (Mongo o Auth0) no cargada correctamente en el API Gateway.');
+  if (
+    !config.mongo.uri ||
+    !config.auth0.domain ||
+    !config.auth0.audience ||
+    !config.services.node.balance ||
+    !config.services.java.balance
+  ) {
+    throw new Error(
+      'Configuración crítica (Mongo, Auth0, o URLs de servicios) no cargada correctamente en API Gateway.'
+    );
   }
 };
 
