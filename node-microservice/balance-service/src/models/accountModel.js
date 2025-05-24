@@ -1,61 +1,92 @@
-import mongoose, { Schema, model } from 'mongoose';
+import { Schema, model } from 'mongoose';
 
-const accountSchema = new Schema(
+const addressSchema = new Schema(
   {
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'El ID del usuario es obligatorio.'],
-      index: true,
-    },
-    accountNumber: {
+    street: { type: String, trim: true },
+    apartmentOrUnit: { type: String, trim: true },
+    city: { type: String, trim: true },
+    stateOrDepartment: { type: String, trim: true },
+    zipCode: { type: String, trim: true },
+    country: { type: String, trim: true, default: 'CO' },
+  },
+  { _id: false }
+);
+
+const identificationDocumentSchema = new Schema(
+  {
+    type: { type: String, enum: ['CC', 'CE', 'PASSPORT', 'NIT', 'TI'], trim: true },
+    number: { type: String, trim: true },
+    issueDate: { type: Date },
+    expiryDate: { type: Date },
+  },
+  { _id: false }
+);
+
+const userSchema = new Schema(
+  {
+    auth0Id: { type: String, required: true, unique: true, index: true, trim: true },
+    firstName: { type: String, required: true, trim: true },
+    lastName: { type: String, required: true, trim: true },
+    email: {
       type: String,
-      required: [true, 'El número de cuenta es obligatorio.'],
-      unique: true,
-      trim: true,
-      index: true,
-    },
-    accountType: {
-      type: String,
-      required: [true, 'El tipo de cuenta es obligatorio.'],
-      enum: ['savings', 'checking', 'credit_line', 'loan'],
-      trim: true,
-    },
-    balance: {
-      type: mongoose.Types.Decimal128,
       required: true,
-      default: mongoose.Types.Decimal128.fromString('0.00'),
-    },
-    currency: {
-      type: String,
-      required: [true, 'La moneda es obligatoria.'],
-      default: 'COP',
-      enum: ['COP', 'USD', 'EUR'],
+      unique: true,
+      lowercase: true,
       trim: true,
     },
+    emailVerified: { type: Boolean, default: false },
+    phone: {
+      countryCode: { type: String, trim: true },
+      number: { type: String, trim: true },
+      isVerified: { type: Boolean, default: false },
+    },
+    address: addressSchema,
+    dateOfBirth: { type: Date },
+    nationality: { type: String, trim: true },
+    identificationDocument: identificationDocumentSchema,
     status: {
       type: String,
-      enum: ['pending_activation', 'active', 'inactive', 'blocked', 'dormant', 'closed'],
-      default: 'pending_activation',
+      enum: [
+        'pending_verification',
+        'active',
+        'inactive',
+        'suspended',
+        'document_verification_required',
+        'closed',
+      ],
+      default: 'pending_verification',
     },
-    overdraftLimit: {
-      type: mongoose.Types.Decimal128,
-      default: mongoose.Types.Decimal128.fromString('0.00'),
+    roles: {
+      type: [
+        {
+          type: String,
+          enum: ['customer', 'admin_support_l1', 'admin_finance', 'admin_operations'],
+        },
+      ],
+      default: ['customer'],
     },
-    interestRate: {
-      type: mongoose.Types.Decimal128,
-      default: mongoose.Types.Decimal128.fromString('0.00'),
+    agreedToTermsVersion: { type: String, trim: true },
+    preferences: {
+      notifications: {
+        email: { type: Boolean, default: true },
+        sms: { type: Boolean, default: false },
+        push: { type: Boolean, default: true },
+      },
+      language: { type: String, default: 'es', trim: true },
     },
+    lastLoginAt: { type: Date },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-accountSchema.methods.canTransact = function () {
-  return this.status === 'active';
-};
+userSchema.virtual('fullName').get(function () {
+  return `${this.firstName} ${this.lastName}`.trim();
+});
 
-const Account = model('Account', accountSchema);
+const User = model('User', userSchema);
 
-export default Account;
+export default User;
