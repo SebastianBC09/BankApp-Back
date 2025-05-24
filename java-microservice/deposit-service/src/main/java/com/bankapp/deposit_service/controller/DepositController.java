@@ -29,7 +29,7 @@ public class DepositController {
             @Valid @RequestBody AmountRequestDTO amountRequest, // Usar un DTO para el cuerpo y validar
             HttpServletRequest request) {
 
-        Long userId;
+        long userId;
         try {
             if (userIdString == null || userIdString.trim().isEmpty()) {
                 throw new InvalidInputException("X-User-ID header is missing or empty.");

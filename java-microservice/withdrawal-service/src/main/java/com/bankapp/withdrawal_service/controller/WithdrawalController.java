@@ -29,7 +29,7 @@ public class WithdrawalController {
             @Valid @RequestBody AmountRequestDTO amountRequest,
             HttpServletRequest request) {
 
-        Long userId;
+        long userId;
         try {
             if (userIdString == null || userIdString.trim().isEmpty()) {
                 throw new InvalidInputException("X-User-ID header is missing or empty.");
