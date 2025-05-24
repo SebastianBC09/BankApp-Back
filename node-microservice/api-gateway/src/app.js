@@ -60,10 +60,6 @@ app.get('/', (_req, res) => {
   res.send(`API Gateway (Modo: ${config.nodeEnv}) funcionando! Hora Bogotá: ${new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' })}`);
 });
 
-app.all('*', (req, _res, next) => {
-  next(new AppError(`La ruta ${req.originalUrl} no se encontró en el API Gateway.`, 404));
-});
-
 app.use((err, req, res, _next) => {
   err.status = err.status || 'error';
 
