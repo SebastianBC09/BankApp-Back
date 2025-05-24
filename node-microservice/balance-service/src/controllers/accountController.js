@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import balanceService from '../services/balanceService.js';
+import balanceService from '../services/accountService.js';
 import AppError from '../utils/appError.js';
 
 class BalanceController {
@@ -10,7 +10,12 @@ class BalanceController {
       const clientIp = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress;
 
       if (!userId) {
-        return next(new AppError('Identificación de usuario no encontrada en la cabecera de la petición (X-User-ID).', 401));
+        return next(
+          new AppError(
+            'Identificación de usuario no encontrada en la cabecera de la petición (X-User-ID).',
+            401
+          )
+        );
       }
       if (!accountId || !mongoose.Types.ObjectId.isValid(accountId)) {
         return next(new AppError('Parámetro accountId inválido o faltante.', 400));

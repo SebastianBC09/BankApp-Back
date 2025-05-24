@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import config from './config/envConfig.js';
-import balanceRoute from '../src/routes/accountRoutes';
+import balanceRoute from '../src/routes/accountRoutes.js';
 
 const app = express();
 
@@ -13,7 +13,7 @@ if (config.nodeEnv === 'development') {
     const morgan = (await import('morgan')).default;
     app.use(morgan('dev'));
   } catch (e) {
-    console.warn("Morgan (HTTP logger) no pudo ser cargado.");
+    console.warn('Morgan (HTTP logger) no pudo ser cargado.');
   }
 }
 
@@ -38,8 +38,9 @@ app.use((err, req, res, next) => {
 
   res.status(err.statusCode).json({
     status: err.status,
-    message: err.isOperational || config.nodeEnv === 'development' ? err.message : 'Algo salió muy mal.',
-    ...(config.nodeEnv === 'development' && { stack: err.stack })
+    message:
+      err.isOperational || config.nodeEnv === 'development' ? err.message : 'Algo salió muy mal.',
+    ...(config.nodeEnv === 'development' && { stack: err.stack }),
   });
 });
 
