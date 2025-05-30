@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import config from './config/envConfig.js';
 import balanceRoute from '../src/routes/accountRoutes.js';
 
@@ -17,7 +16,6 @@ if (config.nodeEnv === 'development') {
   }
 }
 
-app.use(cors());
 app.use('/', balanceRoute);
 
 app.use((err, req, res) => {
@@ -28,7 +26,9 @@ app.use((err, req, res) => {
       message: err.message,
       status: err.status,
       statusCode: err.statusCode,
+      path: req.path,
       stack: err.stack,
+      method: req.method,
       isOperational: err.isOperational
     });
   } else {
