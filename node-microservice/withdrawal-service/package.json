@@ -10,7 +10,7 @@
     "lint": "eslint . --ext .js,.mjs --fix",
     "lint:check": "eslint . --ext .js,.mjs",
     "format": "prettier --write \"**/*.{js,mjs,json,md,yaml,yml}\"",
-    "format:check": "prettier --check \"**/*.{js,mjs,json,md,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,json,md,yaml,yml}\""
   },
   "keywords": [
     "withdrawal",

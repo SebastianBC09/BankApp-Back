@@ -15,13 +15,17 @@ const config = {
 
 const validateConfig = () => {
   const requiredEnvVars = ['MONGO_URI', 'PORT'];
-  const missingVars = requiredEnvVars.filter(key => !process.env[key]);
+  const missingVars = requiredEnvVars.filter((key) => !process.env[key]);
 
   if (missingVars.length > 0) {
-    throw new Error(`Error de configuración: Faltan variables de entorno críticas para Withdrawal Service: ${missingVars.join(', ')}. Verifica tu archivo .env.`);
+    throw new Error(
+      `Error de configuración: Faltan variables de entorno críticas para Withdrawal Service: ${missingVars.join(', ')}. Verifica tu archivo .env.`
+    );
   }
   if (!config.mongo.uri) {
-    throw new Error('Configuración MONGO_URI no cargada correctamente en el objeto config para Withdrawal Service.');
+    throw new Error(
+      'Configuración MONGO_URI no cargada correctamente en el objeto config para Withdrawal Service.'
+    );
   }
 };
 

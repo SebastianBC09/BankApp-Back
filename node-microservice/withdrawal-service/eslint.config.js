@@ -13,8 +13,8 @@ export default [
         module: true,
         require: true,
         __dirname: true,
-        __filename: true
-      }
+        __filename: true,
+      },
     },
     linterOptions: {
       reportUnusedDisableDirectives: 'warn',
