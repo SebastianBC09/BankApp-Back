@@ -39,7 +39,7 @@ app.use((err, req, res) => {
       error: err,
       message: err.message,
       stack: err.stack,
-    });s
+    });
   }
   return res.status(500).json({
     status: 'error',
