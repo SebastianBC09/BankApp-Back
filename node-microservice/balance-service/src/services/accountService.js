@@ -5,59 +5,43 @@ import { logOperation } from '../utils/transactionLogger.js';
 
 class BalanceService {
   async getAccountBalance(details) {
-    const { accountId, userId, clientIp } = details;
-    let operationStatus = 'FAILURE';
-    let logMessage = `Intento de consulta de saldo para cuenta ${accountId} por usuario ${userId}.`;
-
+    const { userId, clientIp } = details;
+    let accountIdForLog = 'N/A';
+    let operationDetailsForLog = {
+      userId,
+      operationType: 'USER_BALANCE_INQUIRY',
+      accountId: accountIdForLog,
+      clientIp,
+    };
     try {
-      if (!userId) {
-        logMessage = 'ID de usuario no proporcionado (cabecera X-User-ID faltante o vacía).';
-        operationStatus = 'INVALID_ATTEMPT';
-        throw new AppError(logMessage, 400);
-      }
-      if (!mongoose.Types.ObjectId.isValid(accountId)) {
-        logMessage = `ID de cuenta inválido: ${accountId}.`;
-        operationStatus = 'INVALID_ATTEMPT';
-        throw new AppError(logMessage, 400);
+      if (!userId || userId.trim() === '') {
+        const message = 'ID de usuario (X-User-ID) no proporcionado o vacío.';
+        await logOperation({ ...operationDetailsForLog, status: 'VALIDATION_ERROR', message });
+        throw new AppError(message, 400);
       }
       if (!mongoose.Types.ObjectId.isValid(userId)) {
-        logMessage = `ID de usuario inválido recibido del API Gateway: ${userId}.`;
-        operationStatus = 'INVALID_ATTEMPT';
-        throw new AppError(logMessage, 400); // O 500 si consideras que esto es un error interno del sistema de gateway
+        const message = `ID de usuario inválido (formato ObjectId esperado): ${userId}.`;
+        await logOperation({ ...operationDetailsForLog, status: 'VALIDATION_ERROR', message });
+        throw new AppError(message, 400);
       }
-
-      const account = await Account.findOne({ _id: accountId, userId: userId }).lean();
-
+      const userObjectId = new mongoose.Types.ObjectId(userId.trim());
+      const account = await Account.findOne({ userId: userObjectId });
       if (!account) {
-        let specificMessage = `Cuenta ${accountId} no encontrada.`;
-        const tempAccount = await Account.findById(accountId).lean();
-        if (tempAccount) {
-          specificMessage = `Cuenta ${accountId} no pertenece al usuario ${userId}. Acceso denegado.`;
-        }
-        logMessage = `Consulta de saldo fallida: ${specificMessage}`;
-        operationStatus = 'INVALID_ATTEMPT';
-        throw new AppError(specificMessage, tempAccount ? 403 : 404);
+        const message = `No se encontró cuenta para el usuario ${userId}.`;
+        await logOperation({ ...operationDetailsForLog, status: 'NOT_FOUND', message });
+        throw new AppError(message, 404);
       }
-
+      accountIdForLog = account._id.toString();
+      operationDetailsForLog.accountId = accountIdForLog;
       if (account.status !== 'active' && account.status !== 'pending_activation') {
-        logMessage = `Consulta de saldo no permitida: La cuenta ${accountId} no está activa. Estado actual: ${account.status}.`;
-        operationStatus = 'FAILURE';
-        throw new AppError(logMessage, 403);
+        const message = `Consulta no permitida: La cuenta N.º ${account.accountNumber} (ID: ${accountIdForLog}) del usuario ${userId} no está activa. Estado: ${account.status}.`;
+        await logOperation({ ...operationDetailsForLog, status: 'ACCOUNT_INACTIVE', message });
+        throw new AppError(message, 403);
       }
-
-      operationStatus = 'SUCCESS';
-      logMessage = `Consulta de saldo exitosa para la cuenta ${accountId} por el usuario ${userId}.`;
-      await logOperation({
-        userId,
-        operationType: 'BALANCE_INQUIRY',
-        accountId,
-        status: operationStatus,
-        message: logMessage,
-        clientIp,
-      });
-
+      const successMessage = `Consulta de saldo exitosa para la cuenta N.º ${account.accountNumber} (ID: ${accountIdForLog}) del usuario ${userId}.`;
+      await logOperation({ ...operationDetailsForLog, status: 'SUCCESS', message: successMessage });
       return {
-        accountId: account._id.toString(),
+        accountId: accountIdForLog,
         balance: account.balance.toString(),
         currency: account.currency,
         accountNumber: account.accountNumber,
@@ -66,20 +50,19 @@ class BalanceService {
       };
 
     } catch (error) {
-      if (operationStatus !== 'SUCCESS') {
-        await logOperation({
-          userId,
-          operationType: 'BALANCE_INQUIRY',
-          accountId,
-          status: operationStatus || 'FAILURE',
-          message: error.message || logMessage,
-          clientIp,
-        });
+      if (error instanceof AppError) {
+        throw error;
       }
-      if (!(error instanceof AppError)) {
-        throw new AppError(error.message || 'Error interno del servidor en servicio de consulta de saldo.', 500);
-      }
-      throw error;
+      const safeUserId = typeof userId === 'string' ? userId : 'N/A_IN_CATCH';
+      const safeClientIp = typeof clientIp === 'string' ? clientIp : 'N/A_IN_CATCH';
+      await logOperation({
+        ...operationDetailsForLog,
+        userId: safeUserId,
+        clientIp: safeClientIp,
+        status: 'SYSTEM_ERROR',
+        message: `Excepción no controlada durante la consulta de saldo: ${error.message}`,
+      });
+      throw new AppError('Error interno del servidor al procesar la consulta de saldo.', 500);
     }
   }
 }

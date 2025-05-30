@@ -23,7 +23,7 @@ export default [
       node: pluginNode,
     },
     rules: {
-      'no-console': 'warn',
+      'no-console': 'off',
     },
   },
   js.configs.recommended,

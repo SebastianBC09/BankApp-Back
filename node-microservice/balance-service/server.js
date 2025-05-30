@@ -1,26 +1,15 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: './.env' });
-
 import config from './src/config/envConfig.js';
 import app from './src/app.js';
 import DatabaseConnector from './src/config/db.js';
 
-let serverInstance;
-
-process.on('uncaughtException', (err) => { /* ... (igual que antes) ... */ });
-process.on('unhandledRejection', (err) => { /* ... (igual que antes, usando serverInstance) ... */});
+const dbConnector = new DatabaseConnector();
 
 const start = async () => {
   try {
-    console.log(`Intentando iniciar Balance Service en modo: ${config.nodeEnv}`);
-    console.log(`Puerto para Balance Service: ${config.port}`);
-
-    const dbConnector = new DatabaseConnector();
     await dbConnector.connect();
-
-    serverInstance = app.listen(config.port, () => {
-      console.log(`Balance Service HTTP corriendo en el puerto ${config.port}.`);
-    });
+    app.listen(config.port, () => {});
   } catch (error) {
     console.error('FALLÓ EL INICIO DEL BALANCE SERVICE:', error);
     process.exit(1);
