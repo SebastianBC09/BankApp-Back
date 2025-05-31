@@ -6,7 +6,6 @@ import com.bankapp.deposit_service.dto.AccountTransactionResponseDataDTO;
 import com.bankapp.deposit_service.exception.AccountNotActiveException;
 import com.bankapp.deposit_service.exception.InvalidInputException;
 import com.bankapp.deposit_service.exception.ResourceNotFoundException;
-import com.bankapp.deposit_service.exception.UnauthorizedAccessException;
 import com.bankapp.deposit_service.utils.TransactionLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,50 +28,45 @@ public class DefaultDepositService implements DepositService{
 
     @Override
     @Transactional
-    public AccountTransactionResponseDataDTO performDeposit(Long accountId, Long userId, BigDecimal amount, String clientIp) {
-        String userIdForLog = Objects.toString(userId, "N/A");
-        String accountIdForLog = Objects.toString(accountId, "N/A");
+    public AccountTransactionResponseDataDTO performDeposit(Long userId, BigDecimal amount, String clientIp) {
+        String userIdForLog = Objects.toString(userId, "N/A_IN_SERVICE");
         String amountForLog = (amount != null) ? amount.toPlainString() : "N/A";
+        String accountIdForLog = "N/A_UNTIL_FETCHED";
 
-        String operationStatus = "FAILURE";
+        String operationStatus;
         String logMessage;
 
-        serviceLog.info("Attempting deposit: userId={}, accountId={}, amount={}", userIdForLog, accountIdForLog, amountForLog);
+        serviceLog.info("Attempting deposit: userId={}, amount={}", userIdForLog, amountForLog);
 
         try {
             if (userId == null) {
-                logMessage = "User ID not provided for deposit.";
+                logMessage = "User ID not provided for deposit (X-User-ID header may be missing).";
                 operationStatus = "INVALID_ATTEMPT";
-                TransactionLogger.logOperation(userIdForLog, "DEPOSIT", accountIdForLog, operationStatus, logMessage, clientIp);
-                throw new InvalidInputException(logMessage);
-            }
-
-            if (accountId == null) {
-                logMessage = "Account ID not provided for deposit.";
-                operationStatus = "INVALID_ATTEMPT";
-                TransactionLogger.logOperation(userIdForLog, "DEPOSIT", accountIdForLog, operationStatus, logMessage, clientIp);
+                TransactionLogger.logTransaction(userIdForLog, "DEPOSIT", accountIdForLog, amountForLog, "N/A", operationStatus, logMessage, clientIp);
                 throw new InvalidInputException(logMessage);
             }
 
             if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
                 logMessage = String.format("Invalid deposit amount: %s. Amount must be positive.", amountForLog);
                 operationStatus = "INVALID_ATTEMPT";
-                TransactionLogger.logOperation(userIdForLog, "DEPOSIT", accountIdForLog, operationStatus, logMessage, clientIp);
+                TransactionLogger.logTransaction(userIdForLog, "DEPOSIT", accountIdForLog, amountForLog, "N/A", operationStatus, logMessage, clientIp);
                 throw new InvalidInputException(logMessage);
             }
 
-            Account account = accountRepository.findByIdAndUserId(accountId, userId)
+            String finalAccountIdForLog = accountIdForLog;
+            Account account = accountRepository.findByUserId(userId)
                     .orElseThrow(() -> {
-                        boolean accountExistsButNotOwned = accountRepository.existsById(accountId);
-                        if (accountExistsButNotOwned) {
-                            return new UnauthorizedAccessException(String.format("Account %s does not belong to user %s. Deposit denied.", accountIdForLog, userIdForLog));
-                        }
-                        return new ResourceNotFoundException(String.format("Account %s not found for deposit for user %s.", accountIdForLog, userIdForLog));
+                        String msg = String.format("No account found for user %s to perform deposit.", userIdForLog);
+                        TransactionLogger.logTransaction(userIdForLog, "DEPOSIT", finalAccountIdForLog, amountForLog, "N/A", "ACCOUNT_NOT_FOUND", msg, clientIp);
+                        return new ResourceNotFoundException(msg);
                     });
 
+            accountIdForLog = account.getId().toString();
+
             if (!"active".equalsIgnoreCase(account.getStatus())) {
-                logMessage = String.format("Deposit failed: Account %s is not active. Current status: %s.", accountIdForLog, account.getStatus());
-                operationStatus = "FAILURE";
+                logMessage = String.format("Deposit failed: Account %s (User: %s) is not active. Current status: %s.",
+                        accountIdForLog, userIdForLog, account.getStatus());
+                operationStatus = "ACCOUNT_INACTIVE";
                 TransactionLogger.logTransaction(userIdForLog, "DEPOSIT", accountIdForLog, amountForLog, account.getCurrency(), operationStatus, logMessage, clientIp);
                 throw new AccountNotActiveException(logMessage);
             }
@@ -80,40 +74,36 @@ public class DefaultDepositService implements DepositService{
             BigDecimal currentBalance = account.getBalance();
             BigDecimal newBalance = currentBalance.add(amount);
             account.setBalance(newBalance);
+            // account.setUpdatedAt(LocalDateTime.now());
             accountRepository.save(account);
 
             operationStatus = "SUCCESS";
-            logMessage = String.format("Deposit of %s %s successful into account %s by user %s. New balance: %s.",
+            logMessage = String.format("Deposit of %s %s successful into account %s (User: %s). New balance: %s.",
                     amountForLog, account.getCurrency(), accountIdForLog, userIdForLog, newBalance.toPlainString());
 
             TransactionLogger.logTransaction(userIdForLog, "DEPOSIT", accountIdForLog, amountForLog, account.getCurrency(), operationStatus, logMessage, clientIp);
 
             return new AccountTransactionResponseDataDTO(
                     "Deposit successful.",
-                    account.getId().toString(),
+                    accountIdForLog,
                     newBalance,
                     account.getCurrency(),
                     amount
             );
 
         } catch (Exception e) {
-            String currencyForErrorLog = "N/A";
-            if (!(e instanceof ResourceNotFoundException || e instanceof UnauthorizedAccessException && e.getMessage().contains("not found"))) {
-            }
-
-
             if (!(e instanceof InvalidInputException ||
                     e instanceof ResourceNotFoundException ||
-                    e instanceof UnauthorizedAccessException ||
                     e instanceof AccountNotActiveException)) {
 
-                logMessage = "Unexpected error during deposit: " + e.getMessage();
-                operationStatus = "FAILURE";
+                logMessage = "Unexpected error during deposit for user " + userIdForLog + ": " + e.getMessage();
+                String currencyForErrorLog = (accountIdForLog.equals("N/A_UNTIL_FETCHED")) ? "N/A" : accountRepository.findById(Long.parseLong(accountIdForLog)).map(Account::getCurrency).orElse("N/A");
 
-                TransactionLogger.logTransaction(userIdForLog, "DEPOSIT", accountIdForLog, amountForLog, currencyForErrorLog, operationStatus, logMessage, clientIp);
-                serviceLog.error("Unexpected error during deposit for user {} and account {}: {}", userIdForLog, accountIdForLog, e.getMessage(), e);
+                TransactionLogger.logTransaction(userIdForLog, "DEPOSIT",
+                        accountIdForLog.equals("N/A_UNTIL_FETCHED") ? null : accountIdForLog,
+                        amountForLog, currencyForErrorLog, "SYSTEM_ERROR", logMessage, clientIp);
+                serviceLog.error("Unexpected error during deposit for user {}: {}", userIdForLog, e.getMessage(), e);
             } else {
-
                 serviceLog.warn("Controlled exception during deposit for user {}: {}", userIdForLog, e.getMessage());
             }
             throw e;
