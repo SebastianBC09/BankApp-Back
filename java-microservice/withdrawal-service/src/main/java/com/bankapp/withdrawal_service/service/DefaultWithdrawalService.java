@@ -12,11 +12,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
 @Service
 public class DefaultWithdrawalService implements WithdrawalService {
     private final AccountRepository accountRepository;
-    private static final Logger log = LoggerFactory.getLogger(DefaultWithdrawalService.class);
+    private static final Logger serviceLog = LoggerFactory.getLogger(DefaultWithdrawalService.class);
 
     @Autowired
     public DefaultWithdrawalService(AccountRepository accountRepository) {
@@ -25,50 +26,55 @@ public class DefaultWithdrawalService implements WithdrawalService {
 
     @Override
     @Transactional
-    public AccountTransactionResponseDataDTO performWithdrawal(Long accountId, Long userId, BigDecimal amount, String clientIp) {
-        String operationStatus = "FAILURE";
-        String logMessage = String.format("Attempting withdrawal of %s from account %d by user %d.", amount, accountId, userId);
-        String amountStringForLog = amount != null ? amount.toPlainString() : "N/A";
-        String userIdForLog = userId != null ? String.valueOf(userId) : "N/A";
-        String accountIdForLog = accountId != null ? String.valueOf(accountId) : "N/A";
+    public AccountTransactionResponseDataDTO performWithdrawal(Long userId, BigDecimal amount, String clientIp) {
+        String userIdForLog = Objects.toString(userId, "N/A_IN_SERVICE");
+        String amountForLog = (amount != null) ? amount.toPlainString() : "N/A";
+        String accountIdForLog = "N/A_UNTIL_FETCHED";
+
+        String operationStatus;
+        String logMessage;
+
+        serviceLog.info("Attempting withdrawal: userId={}, amount={}", userIdForLog, amountForLog);
 
         try {
             if (userId == null) {
-                logMessage = "User ID not provided for withdrawal.";
+                logMessage = "User ID not provided for withdrawal (X-User-ID header may be missing).";
                 operationStatus = "INVALID_ATTEMPT";
-                TransactionLogger.log(userIdForLog, "WITHDRAWAL", accountIdForLog, amountStringForLog, "N/A", operationStatus, logMessage, clientIp);
+                TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL", accountIdForLog, amountForLog, "N/A", operationStatus, logMessage, clientIp);
                 throw new InvalidInputException(logMessage);
             }
 
             if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-                logMessage = String.format("Invalid withdrawal amount: %s. Amount must be positive.", amount);
+                logMessage = String.format("Invalid withdrawal amount: %s. Amount must be positive.", amountForLog);
                 operationStatus = "INVALID_ATTEMPT";
-                TransactionLogger.log(userIdForLog, "WITHDRAWAL", accountIdForLog, amountStringForLog, "N/A", operationStatus, logMessage, clientIp);
+                TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL", accountIdForLog, amountForLog, "N/A", operationStatus, logMessage, clientIp);
                 throw new InvalidInputException(logMessage);
             }
 
-            Account account = accountRepository.findByIdAndUserId(accountId, userId)
+            String finalAccountIdForLog = accountIdForLog;
+            Account account = accountRepository.findByUserId(userId)
                     .orElseThrow(() -> {
-                        boolean accountExistsButNotOwned = accountRepository.existsById(accountId);
-                        if (accountExistsButNotOwned) {
-                            return new UnauthorizedAccessException(String.format("Account %d does not belong to user %d. Withdrawal denied.", accountId, userId));
-                        }
-                        return new ResourceNotFoundException(String.format("Account %d not found for withdrawal for user %d.", accountId, userId));
+                        String msg = String.format("No account found for user %s to perform withdrawal.", userIdForLog);
+                        TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL", finalAccountIdForLog, amountForLog, "N/A", "ACCOUNT_NOT_FOUND", msg, clientIp);
+                        return new ResourceNotFoundException(msg);
                     });
 
+            accountIdForLog = account.getId().toString();
+
             if (!"active".equalsIgnoreCase(account.getStatus())) {
-                logMessage = String.format("Withdrawal failed: Account %d is not active. Current status: %s.", accountId, account.getStatus());
-                operationStatus = "FAILURE";
-                TransactionLogger.log(userIdForLog, "WITHDRAWAL", accountIdForLog, amountStringForLog, account.getCurrency(), operationStatus, logMessage, clientIp);
+                logMessage = String.format("Withdrawal failed: Account %s (User: %s) is not active. Current status: %s.",
+                        accountIdForLog, userIdForLog, account.getStatus());
+                operationStatus = "ACCOUNT_INACTIVE";
+                TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL", accountIdForLog, amountForLog, account.getCurrency(), operationStatus, logMessage, clientIp);
                 throw new AccountNotActiveException(logMessage);
             }
 
             BigDecimal currentBalance = account.getBalance();
             if (currentBalance.compareTo(amount) < 0) {
-                logMessage = String.format("Withdrawal failed: Insufficient funds in account %d. Balance: %s, Requested: %s.",
-                        accountId, currentBalance.toPlainString(), amount.toPlainString());
-                operationStatus = "FAILURE";
-                TransactionLogger.log(userIdForLog, "WITHDRAWAL", accountIdForLog, amountStringForLog, account.getCurrency(), operationStatus, logMessage, clientIp);
+                logMessage = String.format("Withdrawal failed: Insufficient funds in account %s (User: %s). Balance: %s, Requested: %s.",
+                        accountIdForLog, userIdForLog, currentBalance.toPlainString(), amountForLog);
+                operationStatus = "INSUFFICIENT_FUNDS";
+                TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL", accountIdForLog, amountForLog, account.getCurrency(), operationStatus, logMessage, clientIp);
                 throw new InsufficientFundsException(logMessage);
             }
 
@@ -77,23 +83,40 @@ public class DefaultWithdrawalService implements WithdrawalService {
             accountRepository.save(account);
 
             operationStatus = "SUCCESS";
-            logMessage = String.format("Withdrawal of %s %s successful from account %d by user %d. New balance: %s.",
-                    amount.toPlainString(), account.getCurrency(), accountId, userId, newBalance.toPlainString());
+            logMessage = String.format("Withdrawal of %s %s successful from account %s (User: %s). New balance: %s.",
+                    amountForLog, account.getCurrency(), accountIdForLog, userIdForLog, newBalance.toPlainString());
 
-            TransactionLogger.log(userIdForLog, "WITHDRAWAL", accountIdForLog, amount.toPlainString(), account.getCurrency(), operationStatus, logMessage, clientIp);
+            TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL", accountIdForLog, amountForLog, account.getCurrency(), operationStatus, logMessage, clientIp);
 
             return new AccountTransactionResponseDataDTO(
                     "Withdrawal successful.",
-                    account.getId().toString(),
+                    accountIdForLog,
                     newBalance,
                     account.getCurrency(),
                     amount
             );
 
         } catch (Exception e) {
-            if (!"SUCCESS".equals(operationStatus)) {
-                logMessage = e.getMessage();
-                TransactionLogger.log(userIdForLog, "WITHDRAWAL", accountIdForLog, amountStringForLog, "N/A", operationStatus, logMessage, clientIp);
+            if (!(e instanceof InvalidInputException ||
+                    e instanceof ResourceNotFoundException ||
+                    e instanceof AccountNotActiveException ||
+                    e instanceof InsufficientFundsException)) {
+
+                logMessage = "Unexpected error during withdrawal for user " + userIdForLog + ": " + e.getMessage();
+                String currencyForErrorLog = "N/A";
+                if (!accountIdForLog.equals("N/A_UNTIL_FETCHED")) {
+                    try {
+                        Account tempAccount = accountRepository.findById(Long.parseLong(accountIdForLog)).orElse(null);
+                        if (tempAccount != null) currencyForErrorLog = tempAccount.getCurrency();
+                    } catch (NumberFormatException ignored) {}
+                }
+
+                TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL",
+                        accountIdForLog.equals("N/A_UNTIL_FETCHED") ? null : accountIdForLog,
+                        amountForLog, currencyForErrorLog, "SYSTEM_ERROR", logMessage, clientIp);
+                serviceLog.error("Unexpected error during withdrawal for user {}: {}", userIdForLog, e.getMessage(), e);
+            } else {
+                serviceLog.warn("Controlled exception during withdrawal for user {}: {}", userIdForLog, e.getMessage());
             }
             throw e;
         }
