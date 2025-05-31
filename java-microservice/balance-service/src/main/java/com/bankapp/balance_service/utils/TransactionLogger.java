@@ -16,9 +16,9 @@ public class TransactionLogger {
         String logEntry = String.format("TIMESTAMP: %s | USER_ID: %s | OPERATION: %s | ACCOUNT_ID: %s | STATUS: %s | IP: %s | MESSAGE: %s",
                 Instant.now().toString(),
                 Objects.toString(userId, "N/A"),
-                operationType,
+                Objects.toString(operationType, "N/A"),
                 Objects.toString(accountId, "N/A"),
-                status,
+                Objects.toString(status, "N/A"),
                 Objects.toString(clientIp, "N/A"),
                 message);
         writeToTraceLog(logEntry);
