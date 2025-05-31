@@ -33,9 +33,11 @@ const config = {
     deposit_java: process.env.JAVA_DEPOSIT_SERVICE_URL,
     withdrawal_java: process.env.JAVA_WITHDRAWAL_SERVICE_URL,
   },
+  goSyncServiceUrl: process.env.GO_SYNC_SERVICE_URL || 'http://localhost:8090',
   cors: {
     origin: process.env.CORS_ORIGIN || '*',
   },
+
 };
 
 if (!config.auth0.domain || !config.auth0.audience) {
