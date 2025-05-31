@@ -99,13 +99,13 @@ public class WithdrawalController {
         }
         controllerLog.debug("Client IP for withdrawal request: {}", clientIp);
 
-        AccountTransactionResponseDataDTO withdrawalResponse = withdrawalService.performWithdrawal(
+        ApiResponseDTO<AccountTransactionResponseDataDTO> apiResponse = withdrawalService.performWithdrawal(
                 userId,
                 amount,
                 clientIp
         );
 
         controllerLog.info("Withdrawal processed successfully for user ID: {}", userId);
-        return ResponseEntity.ok(ApiResponseDTO.success(withdrawalResponse));
+        return ResponseEntity.ok(apiResponse);
     }
 }

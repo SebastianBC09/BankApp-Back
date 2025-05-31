@@ -1,6 +1,7 @@
 package com.bankapp.withdrawal_service.service;
 
 import com.bankapp.withdrawal_service.dto.AccountTransactionResponseDataDTO;
+import com.bankapp.withdrawal_service.dto.ApiResponseDTO;
 import com.bankapp.withdrawal_service.exception.*;
 import com.bankapp.withdrawal_service.model.Account;
 import com.bankapp.withdrawal_service.repository.AccountRepository;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Objects;
 
 @Service
@@ -26,10 +28,11 @@ public class DefaultWithdrawalService implements WithdrawalService {
 
     @Override
     @Transactional
-    public AccountTransactionResponseDataDTO performWithdrawal(Long userId, BigDecimal amount, String clientIp) {
+    public ApiResponseDTO<AccountTransactionResponseDataDTO> performWithdrawal(Long userId, BigDecimal amount, String clientIp) {
         String userIdForLog = Objects.toString(userId, "N/A_IN_SERVICE");
         String amountForLog = (amount != null) ? amount.toPlainString() : "N/A";
         String accountIdForLog = "N/A_UNTIL_FETCHED";
+        Account account = null;
 
         String operationStatus;
         String logMessage;
@@ -51,11 +54,11 @@ public class DefaultWithdrawalService implements WithdrawalService {
                 throw new InvalidInputException(logMessage);
             }
 
-            String finalAccountIdForLog = accountIdForLog;
-            Account account = accountRepository.findByUserId(userId)
+            final String initialAccountIdForLog = accountIdForLog;
+            account = accountRepository.findByUserId(userId)
                     .orElseThrow(() -> {
                         String msg = String.format("No account found for user %s to perform withdrawal.", userIdForLog);
-                        TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL", finalAccountIdForLog, amountForLog, "N/A", "ACCOUNT_NOT_FOUND", msg, clientIp);
+                        TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL", initialAccountIdForLog, amountForLog, "N/A", "ACCOUNT_NOT_FOUND", msg, clientIp);
                         return new ResourceNotFoundException(msg);
                     });
 
@@ -83,18 +86,23 @@ public class DefaultWithdrawalService implements WithdrawalService {
             accountRepository.save(account);
 
             operationStatus = "SUCCESS";
-            logMessage = String.format("Withdrawal of %s %s successful from account %s (User: %s). New balance: %s.",
-                    amountForLog, account.getCurrency(), accountIdForLog, userIdForLog, newBalance.toPlainString());
+            logMessage = String.format("Withdrawal of %s %s successful from account %s (User: %s, AccountNumber: %s). New balance: %s.",
+                    amountForLog, account.getCurrency(), accountIdForLog, userIdForLog, account.getAccountNumber(), newBalance.toPlainString());
 
             TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL", accountIdForLog, amountForLog, account.getCurrency(), operationStatus, logMessage, clientIp);
 
-            return new AccountTransactionResponseDataDTO(
-                    "Withdrawal successful.",
-                    accountIdForLog,
-                    newBalance,
-                    account.getCurrency(),
-                    amount
-            );
+            AccountTransactionResponseDataDTO dataDto = AccountTransactionResponseDataDTO.builder()
+                    .message("El retiro de la cuenta PostgreSQL fue completado.")
+                    .accountId(accountIdForLog)
+                    .accountNumber(account.getAccountNumber())
+                    .newBalance(newBalance)
+                    .currency(account.getCurrency())
+                    .amountWithdrawn(amount)
+                    .transactionId("pg_txn_wdr_" + System.currentTimeMillis())
+                    .transactionTimestamp(Instant.now().toString())
+                    .build();
+
+            return ApiResponseDTO.success(dataDto, "Retiro procesado exitosamente desde Java.");
 
         } catch (Exception e) {
             if (!(e instanceof InvalidInputException ||
@@ -104,11 +112,8 @@ public class DefaultWithdrawalService implements WithdrawalService {
 
                 logMessage = "Unexpected error during withdrawal for user " + userIdForLog + ": " + e.getMessage();
                 String currencyForErrorLog = "N/A";
-                if (!accountIdForLog.equals("N/A_UNTIL_FETCHED")) {
-                    try {
-                        Account tempAccount = accountRepository.findById(Long.parseLong(accountIdForLog)).orElse(null);
-                        if (tempAccount != null) currencyForErrorLog = tempAccount.getCurrency();
-                    } catch (NumberFormatException ignored) {}
+                if (account != null) {
+                    currencyForErrorLog = account.getCurrency();
                 }
 
                 TransactionLogger.logTransaction(userIdForLog, "WITHDRAWAL",

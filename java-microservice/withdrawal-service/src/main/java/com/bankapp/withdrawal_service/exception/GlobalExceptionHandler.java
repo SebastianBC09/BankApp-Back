@@ -84,10 +84,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponseDTO<Object>> handleGlobalException(Exception ex) {
-        System.err.println("Ocurrió un error inesperado: " + ex.getMessage());
-        ex.printStackTrace();
+        log.error("Ocurrió un error inesperado: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponseDTO.error("Ocurrió un error interno inesperado en el servidor."));
+                .body(ApiResponseDTO.error("Ocurrió un error interno inesperado en el servidor.")); // Ahora esto es compatible
     }
 
 }
