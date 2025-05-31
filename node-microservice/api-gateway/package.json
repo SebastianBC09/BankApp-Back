@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "NODE_ENV=development nodemon server.js",
+    "dev": "NODE_ENV=development nodemon --trace-warnings server.js",
     "lint": "eslint . --ext .js,.mjs --fix",
     "lint:check": "eslint . --ext .js,.mjs",
     "format": "prettier --write \"**/*.{js,mjs,json,md,yaml,yml}\"",
@@ -24,9 +24,9 @@
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-oauth2-jwt-bearer": "^1.6.1",
-    "http-proxy-middleware": "^3.0.5",
     "mongoose": "^8.15.0",
     "morgan": "^1.10.0",
+    "pg": "^8.16.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },
@@ -37,7 +37,14 @@
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^5.4.0",
     "globals": "^16.1.0",
+    "http-proxy-middleware": "^3.0.5",
     "nodemon": "^3.1.10",
+    "patch-package": "^8.0.0",
     "prettier": "^3.5.3"
+  },
+  "overrides": {
+    "http-proxy-middleware": {
+      "http-proxy": "github:nikeee/node-http-proxy#b42c38fc3486ee8ad4374cc2397458b6e4cd99ca"
+    }
   }
 }
