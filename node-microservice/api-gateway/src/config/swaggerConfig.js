@@ -51,7 +51,7 @@ const swaggerDefinition = {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        description: "Ingresa el token JWT Bearer de Auth0.",
+        description: 'Ingresa el token JWT Bearer de Auth0.',
       },
     },
     schemas: {
@@ -61,14 +61,18 @@ const swaggerDefinition = {
           status: { type: 'string' },
           message: { type: 'string' },
         },
-        required: ['status', 'message']
+        required: ['status', 'message'],
       },
       ErrorResponseDebug: {
         type: 'object',
         properties: {
           status: { type: 'string', example: 'error' },
           message: { type: 'string', example: 'Mensaje detallado del error.' },
-          stack: { type: 'string', example: 'Stack trace del error (solo en desarrollo).', nullable: true }
+          stack: {
+            type: 'string',
+            example: 'Stack trace del error (solo en desarrollo).',
+            nullable: true,
+          },
         },
       },
       NotFoundErrorPayload: {
@@ -97,14 +101,23 @@ const swaggerDefinition = {
         properties: {
           status: { type: 'string', example: 'fail' },
           message: { type: 'string', example: 'Petición incorrecta o datos inválidos.' },
-          details: { type: 'object', description: 'Detalles de errores de validación, si aplica.', nullable: true}
-        }
+          details: {
+            type: 'object',
+            description: 'Detalles de errores de validación, si aplica.',
+            nullable: true,
+          },
+        },
       },
       NodeUserProfileInput: {
         type: 'object',
         required: [
-          'firstName', 'lastName', 'identificationDocument',
-          'address', 'phone', 'dateOfBirth', 'nationality'
+          'firstName',
+          'lastName',
+          'identificationDocument',
+          'address',
+          'phone',
+          'dateOfBirth',
+          'nationality',
         ],
         properties: {
           firstName: { type: 'string', example: 'Ana' },
@@ -124,7 +137,7 @@ const swaggerDefinition = {
               stateOrDepartment: { type: 'string', example: 'Cundinamarca' },
               country: { type: 'string', example: 'CO' },
               postalCode: { type: 'string', example: '110111', nullable: true },
-            }
+            },
           },
           dateOfBirth: { type: 'string', format: 'date', example: '1992-03-20' },
           nationality: { type: 'string', example: 'Colombiana' },
@@ -134,7 +147,7 @@ const swaggerDefinition = {
             properties: {
               type: { type: 'string', enum: ['CC', 'CE', 'PASSPORT', 'NIT', 'TI'], example: 'CC' },
               number: { type: 'string', example: '1020304050' },
-            }
+            },
           },
           agreedToTermsVersion: { type: 'string', nullable: true, example: 'v1.3-2025' },
         },
@@ -149,42 +162,75 @@ const swaggerDefinition = {
           fullName: { type: 'string', readOnly: true },
           email: { type: 'string', format: 'email' },
           emailVerified: { type: 'boolean' },
-          phone: { type: 'object', properties: { countryCode: {type: 'string'}, number: {type: 'string'}, isVerified: {type: 'boolean'} } },
-          address: { type: 'object', properties: { street: {type: 'string'}, city: {type: 'string'}, stateOrDepartment: {type: 'string'}, country: {type: 'string'}, postalCode: {type: 'string', nullable: true} } },
+          phone: {
+            type: 'object',
+            properties: {
+              countryCode: { type: 'string' },
+              number: { type: 'string' },
+              isVerified: { type: 'boolean' },
+            },
+          },
+          address: {
+            type: 'object',
+            properties: {
+              street: { type: 'string' },
+              city: { type: 'string' },
+              stateOrDepartment: { type: 'string' },
+              country: { type: 'string' },
+              postalCode: { type: 'string', nullable: true },
+            },
+          },
           dateOfBirth: { type: 'string', format: 'date', nullable: true },
           nationality: { type: 'string', nullable: true },
-          identificationDocument: { type: 'object', properties: { type: {type: 'string'}, number: {type: 'string'} }, nullable: true },
+          identificationDocument: {
+            type: 'object',
+            properties: { type: { type: 'string' }, number: { type: 'string' } },
+            nullable: true,
+          },
           status: { type: 'string' },
           roles: { type: 'array', items: { type: 'string' } },
           agreedToTermsVersion: { type: 'string', nullable: true },
-          preferences: { type: 'object', properties: { notifications: {type: 'object', properties: { email: {type: 'boolean'}, sms: {type: 'boolean'}, push: {type: 'boolean'}}}, language: {type: 'string'} } },
-          lastLoginAt: { type: 'string', format: 'date-time', nullable: true},
+          preferences: {
+            type: 'object',
+            properties: {
+              notifications: {
+                type: 'object',
+                properties: {
+                  email: { type: 'boolean' },
+                  sms: { type: 'boolean' },
+                  push: { type: 'boolean' },
+                },
+              },
+              language: { type: 'string' },
+            },
+          },
+          lastLoginAt: { type: 'string', format: 'date-time', nullable: true },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
-        }
+        },
       },
       NodeUserProvisionResponse: {
         type: 'object',
         properties: {
           message: { type: 'string' },
           auth0UserSub: { type: 'string' },
-          databaseUser: { $ref: '#/components/schemas/NodeUserResponse' }
-        }
+          databaseUser: { $ref: '#/components/schemas/NodeUserResponse' },
+        },
       },
       NodeProfileCompletionResponseData: {
         type: 'object',
         properties: {
           user: { $ref: '#/components/schemas/NodeUserResponse' },
-          account: { $ref: '#/components/schemas/NodeAccountResponse' }
-        }
+          account: { $ref: '#/components/schemas/NodeAccountResponse' },
+        },
       },
       NodeProfileCompletionResponse: {
         type: 'object',
         properties: {
-          status: { type: 'string', example: 'success'},
+          status: { type: 'string', example: 'success' },
           message: { type: 'string' },
-          data: { $ref: '#/components/schemas/NodeProfileCompletionResponseData' }
-        }
+          data: { $ref: '#/components/schemas/NodeProfileCompletionResponseData' },
+        },
       },
       NodeAmountRequest: {
         type: 'object',
@@ -207,10 +253,13 @@ const swaggerDefinition = {
           accountType: { type: 'string', enum: ['savings', 'checking', 'credit_line', 'loan'] },
           balance: { type: 'string', description: 'Saldo como string (Decimal128 de Mongoose)' },
           currency: { type: 'string', enum: ['COP', 'USD', 'EUR'] },
-          status: { type: 'string', enum: ['pending_activation', 'active', 'inactive', 'blocked', 'dormant', 'closed']},
+          status: {
+            type: 'string',
+            enum: ['pending_activation', 'active', 'inactive', 'blocked', 'dormant', 'closed'],
+          },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
-        }
+        },
       },
       NodeAccountBalanceData: {
         type: 'object',
@@ -221,7 +270,7 @@ const swaggerDefinition = {
           accountNumber: { type: 'string' },
           accountType: { type: 'string' },
           status: { type: 'string' },
-        }
+        },
       },
       NodeAccountBalanceResponse: {
         type: 'object',
@@ -238,7 +287,7 @@ const swaggerDefinition = {
           newBalance: { type: 'string' },
           currency: { type: 'string' },
           amountProcessed: { type: 'string' },
-        }
+        },
       },
       NodeAccountTransactionResponse: {
         type: 'object',
@@ -253,45 +302,45 @@ const swaggerDefinition = {
         description: 'No autorizado. Token JWT ausente, inválido o expirado.',
         content: {
           'application/json': {
-            schema: { $ref: '#/components/schemas/UnauthorizedPayload' }
-          }
-        }
+            schema: { $ref: '#/components/schemas/UnauthorizedPayload' },
+          },
+        },
       },
       ForbiddenError: {
         description: 'Prohibido. El usuario no tiene permisos o la operación no está permitida.',
         content: {
           'application/json': {
-            schema: { $ref: '#/components/schemas/ForbiddenPayload' }
-          }
-        }
+            schema: { $ref: '#/components/schemas/ForbiddenPayload' },
+          },
+        },
       },
       NotFoundError: {
         description: 'Recurso no encontrado.',
         content: {
           'application/json': {
-            schema: { $ref: '#/components/schemas/NotFoundErrorPayload' }
-          }
-        }
+            schema: { $ref: '#/components/schemas/NotFoundErrorPayload' },
+          },
+        },
       },
       BadRequestError: {
         description: 'Petición incorrecta o datos de entrada inválidos.',
         content: {
           'application/json': {
-            schema: { $ref: '#/components/schemas/BadRequestPayload' }
-          }
-        }
+            schema: { $ref: '#/components/schemas/BadRequestPayload' },
+          },
+        },
       },
       InternalServerError: {
         description: 'Error interno del servidor.',
         content: {
           'application/json': {
-            schema: { $ref: '#/components/schemas/ErrorResponseDebug' }
-          }
-        }
-      }
-    }
+            schema: { $ref: '#/components/schemas/ErrorResponseDebug' },
+          },
+        },
+      },
+    },
   },
-  security: [{ bearerAuth: [] }]
+  security: [{ bearerAuth: [] }],
 };
 
 const options = {
