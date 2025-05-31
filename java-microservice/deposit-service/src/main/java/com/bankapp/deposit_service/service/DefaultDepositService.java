@@ -1,5 +1,6 @@
 package com.bankapp.deposit_service.service;
 
+import com.bankapp.deposit_service.dto.ApiResponseDTO;
 import com.bankapp.deposit_service.model.Account;
 import com.bankapp.deposit_service.repository.AccountRepository;
 import com.bankapp.deposit_service.dto.AccountTransactionResponseDataDTO;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Objects;
 
 @Service
@@ -28,10 +30,11 @@ public class DefaultDepositService implements DepositService{
 
     @Override
     @Transactional
-    public AccountTransactionResponseDataDTO performDeposit(Long userId, BigDecimal amount, String clientIp) {
+    public ApiResponseDTO<AccountTransactionResponseDataDTO> performDeposit(Long userId, BigDecimal amount, String clientIp) {
         String userIdForLog = Objects.toString(userId, "N/A_IN_SERVICE");
         String amountForLog = (amount != null) ? amount.toPlainString() : "N/A";
         String accountIdForLog = "N/A_UNTIL_FETCHED";
+        Account account = null;
 
         String operationStatus;
         String logMessage;
@@ -53,11 +56,11 @@ public class DefaultDepositService implements DepositService{
                 throw new InvalidInputException(logMessage);
             }
 
-            String finalAccountIdForLog = accountIdForLog;
-            Account account = accountRepository.findByUserId(userId)
+            final String initialAccountIdForLog = accountIdForLog;
+            account = accountRepository.findByUserId(userId)
                     .orElseThrow(() -> {
                         String msg = String.format("No account found for user %s to perform deposit.", userIdForLog);
-                        TransactionLogger.logTransaction(userIdForLog, "DEPOSIT", finalAccountIdForLog, amountForLog, "N/A", "ACCOUNT_NOT_FOUND", msg, clientIp);
+                        TransactionLogger.logTransaction(userIdForLog, "DEPOSIT", initialAccountIdForLog, amountForLog, "N/A", "ACCOUNT_NOT_FOUND", msg, clientIp);
                         return new ResourceNotFoundException(msg);
                     });
 
@@ -74,22 +77,26 @@ public class DefaultDepositService implements DepositService{
             BigDecimal currentBalance = account.getBalance();
             BigDecimal newBalance = currentBalance.add(amount);
             account.setBalance(newBalance);
-            // account.setUpdatedAt(LocalDateTime.now());
             accountRepository.save(account);
 
             operationStatus = "SUCCESS";
-            logMessage = String.format("Deposit of %s %s successful into account %s (User: %s). New balance: %s.",
-                    amountForLog, account.getCurrency(), accountIdForLog, userIdForLog, newBalance.toPlainString());
+            logMessage = String.format("Deposit of %s %s successful into account %s (User: %s, AccountNumber: %s). New balance: %s.",
+                    amountForLog, account.getCurrency(), accountIdForLog, userIdForLog, account.getAccountNumber(), newBalance.toPlainString());
 
             TransactionLogger.logTransaction(userIdForLog, "DEPOSIT", accountIdForLog, amountForLog, account.getCurrency(), operationStatus, logMessage, clientIp);
 
-            return new AccountTransactionResponseDataDTO(
-                    "Deposit successful.",
-                    accountIdForLog,
-                    newBalance,
-                    account.getCurrency(),
-                    amount
-            );
+            AccountTransactionResponseDataDTO dataDto = AccountTransactionResponseDataDTO.builder()
+                    .message("El depósito en la cuenta PostgreSQL fue completado.")
+                    .accountId(accountIdForLog)
+                    .accountNumber(account.getAccountNumber())
+                    .newBalance(newBalance)
+                    .currency(account.getCurrency())
+                    .amountDeposited(amount)
+                    .transactionId("pg_txn_dep_" + System.currentTimeMillis())
+                    .transactionTimestamp(Instant.now().toString())
+                    .build();
+
+            return ApiResponseDTO.success(dataDto, "Depósito procesado exitosamente desde Java.");
 
         } catch (Exception e) {
             if (!(e instanceof InvalidInputException ||
@@ -97,7 +104,10 @@ public class DefaultDepositService implements DepositService{
                     e instanceof AccountNotActiveException)) {
 
                 logMessage = "Unexpected error during deposit for user " + userIdForLog + ": " + e.getMessage();
-                String currencyForErrorLog = (accountIdForLog.equals("N/A_UNTIL_FETCHED")) ? "N/A" : accountRepository.findById(Long.parseLong(accountIdForLog)).map(Account::getCurrency).orElse("N/A");
+                String currencyForErrorLog = "N/A";
+                if (account != null) {
+                    currencyForErrorLog = account.getCurrency();
+                }
 
                 TransactionLogger.logTransaction(userIdForLog, "DEPOSIT",
                         accountIdForLog.equals("N/A_UNTIL_FETCHED") ? null : accountIdForLog,

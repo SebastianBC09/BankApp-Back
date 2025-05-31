@@ -90,12 +90,13 @@ public class DepositController {
             clientIp = clientIp.split(",")[0].trim();
         }
         controllerLog.debug("Client IP for deposit request: {}", clientIp);
-        AccountTransactionResponseDataDTO depositResponse = depositService.performDeposit(
+
+        ApiResponseDTO<AccountTransactionResponseDataDTO> apiResponse = depositService.performDeposit(
                 userId,
                 amount,
                 clientIp
         );
         controllerLog.info("Deposit processed successfully for user ID: {}", userId);
-        return ResponseEntity.ok(ApiResponseDTO.success(depositResponse));
+        return ResponseEntity.ok(apiResponse);
     }
 }
