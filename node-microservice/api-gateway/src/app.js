@@ -209,7 +209,8 @@ app.use(
     SERVICE_TARGETS.balance.node,
     SERVICE_TARGETS.balance.pathRewriteNode,
     SERVICE_TARGETS.balance.java,
-    SERVICE_TARGETS.balance.pathRewriteJava
+    SERVICE_TARGETS.balance.pathRewriteJava,
+    { type: 'BALANCE_READ' }
   )
 );
 
@@ -413,7 +414,8 @@ app.use(
     SERVICE_TARGETS.deposit.node,
     SERVICE_TARGETS.deposit.pathRewriteNode,
     SERVICE_TARGETS.deposit.java,
-    SERVICE_TARGETS.deposit.pathRewriteJava
+    SERVICE_TARGETS.deposit.pathRewriteJava,
+    { type: 'DEPOSIT' }
   )
 );
 
@@ -622,7 +624,8 @@ app.use(
     SERVICE_TARGETS.withdraw.node,
     SERVICE_TARGETS.withdraw.pathRewriteNode,
     SERVICE_TARGETS.withdraw.java,
-    SERVICE_TARGETS.withdraw.pathRewriteJava
+    SERVICE_TARGETS.withdraw.pathRewriteJava,
+    { type: 'WITHDRAWAL' }
   )
 );
 
