@@ -32,7 +32,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpecification, { ex
 
 /**
  * @swagger
- * /api/balance:
+ * /api/account/balance:
  *   get:
  *       summary: Consultar saldo de la cuenta del usuario autenticado (Node.js)
  *       tags:
@@ -216,7 +216,7 @@ app.use(
 
 /**
  * @swagger
- * /api/deposit:
+ * /api/account/deposit:
  *     post:
  *       summary: Realizar un depósito en la cuenta del usuario (Node.js)
  *       tags:
@@ -421,7 +421,7 @@ app.use(
 
 /**
  * @swagger
- * /api/withdraw:
+ * /api/account/withdraw:
  *     post:
  *       summary: Realizar un retiro de la cuenta del usuario (Node.js)
  *       tags:
